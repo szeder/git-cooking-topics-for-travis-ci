@@ -365,7 +365,7 @@ all::
 # Define GETTEXT_POISON if you are debugging the choice of strings marked
 # for translation.  In a GETTEXT_POISON build, you can turn all strings marked
 # for translation into gibberish by setting the GIT_GETTEXT_POISON variable
-# (to any value) in your environment.
+# to a non-empty value in your environment.
 #
 # Define JSMIN to point to JavaScript minifier that functions as
 # a filter to have gitweb.js minified.

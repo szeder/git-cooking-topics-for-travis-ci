@@ -94,10 +94,11 @@ then
 	jobname="$TRAVIS_OS_NAME-$CC"
 fi
 
+TEST_ROOT_DIR="$HOME/t"
 export DEVELOPER=1
 export DEFAULT_TEST_TARGET=prove
 export GIT_PROVE_OPTS="--timer --jobs 3 --state=failed,slow,save"
-export GIT_TEST_OPTS="--verbose-log -x --immediate"
+export GIT_TEST_OPTS="--verbose-log -x --immediate --short-trash-dir --root='$TEST_ROOT_DIR'"
 export GIT_TEST_CLONE_2GB=YesPlease
 if [ "$jobname" = linux-gcc ]; then
 	export CC=gcc-8
@@ -125,5 +126,10 @@ osx-clang|osx-gcc)
 	;;
 GETTEXT_POISON)
 	export GETTEXT_POISON=YesPlease
+	export GIT_GETTEXT_POISON=scrambled
+	;;
+Linux32)
+	TEST_ROOT_DIR=t/
+	export GIT_TEST_OPTS="${GIT_TEST_OPTS%--root=*}"
 	;;
 esac

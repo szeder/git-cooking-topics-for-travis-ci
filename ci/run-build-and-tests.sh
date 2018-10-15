@@ -8,15 +8,24 @@
 ln -s "$cache_dir/.prove" t/.prove
 
 make --jobs=2
-make --quiet test
-if test "$jobname" = "linux-gcc"
-then
-	export GIT_TEST_SPLIT_INDEX=yes
-	export GIT_TEST_FULL_IN_PACK_ARRAY=true
-	export GIT_TEST_OE_SIZE=10
-	export GIT_TEST_OE_DELTA_SIZE=5
+mkfifo .git/prove-output
+cat .git/prove-output &
+{
 	make --quiet test
-fi
+
+	case "$jobname" in
+	linux-gcc)
+		export GIT_TEST_SPLIT_INDEX=yes
+		export GIT_TEST_FULL_IN_PACK_ARRAY=true
+		export GIT_TEST_OE_SIZE=10
+		export GIT_TEST_OE_DELTA_SIZE=5
+		make --quiet test
+		;;
+	GETTEXT_POISON)
+		GIT_GETTEXT_POISON=YesPlease make --quiet test
+		;;
+	esac
+} >.git/prove-output
 
 check_unignored_build_artifacts
 

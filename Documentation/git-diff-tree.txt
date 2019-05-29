@@ -115,7 +115,6 @@ include::pretty-options.txt[]
 
 include::pretty-formats.txt[]
 
-
 LIMITING OUTPUT
 ---------------
 If you're only interested in differences in a subset of files, for

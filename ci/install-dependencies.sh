@@ -12,7 +12,8 @@ case "$jobname" in
 linux-clang|linux-gcc)
 	sudo apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
 	sudo apt-get -q update
-	sudo apt-get -q -y install language-pack-is git-svn apache2
+	sudo apt-get -q -y install language-pack-is libsvn-perl apache2 \
+		acl libio-pty-perl libjson-perl libhttp-date-perl
 	case "$jobname" in
 	linux-gcc)
 		sudo apt-get -q -y install gcc-8
@@ -34,20 +35,30 @@ linux-clang|linux-gcc)
 	popd
 	;;
 osx-clang|osx-gcc)
-	brew update --quiet
+	export HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_AUTO_UPDATE=1
 	# Uncomment this if you want to run perf tests:
 	# brew install gnu-time
 	brew install git-lfs gettext
 	brew link --force gettext
 	brew install caskroom/cask/perforce
+	case "$jobname" in
+	osx-gcc)
+		brew link gcc@8
+		;;
+	esac
+	;;
+Linux32)
+	docker pull szeder/ubuntu32-for-git-ci:16.04-1
 	;;
 StaticAnalysis)
-	sudo apt-get -q update
-	sudo apt-get -q -y install coccinelle
+	docker pull szeder/coccinelle:1.0.7-1
 	;;
 Documentation)
 	sudo apt-get -q update
 	sudo apt-get -q -y install asciidoc xmlto
+
+	test -n "$ALREADY_HAVE_ASCIIDOCTOR" ||
+	gem install --version 1.5.8 asciidoctor
 	;;
 esac
 

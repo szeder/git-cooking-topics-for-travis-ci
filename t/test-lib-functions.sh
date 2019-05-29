@@ -778,16 +778,16 @@ test_cmp_bin() {
 
 # Use this instead of test_cmp to compare files that contain expected and
 # actual output from git commands that can be translated.  When running
-# under GIT_TEST_GETTEXT_POISON this pretends that the command produced expected
+# under GETTEXT_POISON this pretends that the command produced expected
 # results.
 test_i18ncmp () {
-	! test_have_prereq C_LOCALE_OUTPUT || test_cmp "$@"
+	test -n "$GETTEXT_POISON" || test_cmp "$@"
 }
 
 # Use this instead of "grep expected-string actual" to see if the
 # output from a git command that can be translated either contains an
 # expected string, or does not contain an unwanted one.  When running
-# under GIT_TEST_GETTEXT_POISON this pretends that the command produced expected
+# under GETTEXT_POISON this pretends that the command produced expected
 # results.
 test_i18ngrep () {
 	eval "last_arg=\${$#}"
@@ -801,7 +801,7 @@ test_i18ngrep () {
 		BUG "too few parameters to test_i18ngrep"
 	fi
 
-	if test_have_prereq !C_LOCALE_OUTPUT
+	if test -n "$GETTEXT_POISON"
 	then
 		# pretend success
 		return 0
@@ -925,6 +925,34 @@ test_when_finished () {
 	BUG "test_when_finished does nothing in a subshell"
 	test_cleanup="{ $*
 		} && (exit \"\$eval_ret\"); eval_ret=\$?; $test_cleanup"
+}
+
+# This function can be used to schedule some commands to be run
+# unconditionally at the end of the test script, e.g. to stop a daemon:
+#
+#	test_expect_success 'test git daemon' '
+#		git daemon &
+#		daemon_pid=$! &&
+#		test_atexit 'kill $daemon_pid' &&
+#		hello world
+#	'
+#
+# The commands will be executed before the trash directory is removed,
+# i.e. the atexit commands will still be able to access any pidfiles or
+# socket files.
+#
+# Note that these commands will be run even when a test script run
+# with '--immediate' fails.  Be careful with your atexit commands to
+# minimize any changes to the failed state.
+
+test_atexit () {
+	# We cannot detect when we are in a subshell in general, but by
+	# doing so on Bash is better than nothing (the test will
+	# silently pass on other shells).
+	test "${BASH_SUBSHELL-0}" = 0 ||
+	error "bug in test script: test_atexit does nothing in a subshell"
+	test_atexit_cleanup="{ $*
+		} && (exit \"\$eval_ret\"); eval_ret=\$?; $test_atexit_cleanup"
 }
 
 # Most tests can use the created repository, but some may need to create more.

@@ -129,6 +129,8 @@ do
 		tee=t ;;
 	--root=*)
 		root=${opt#--*=} ;;
+	--short-trash-dir)
+		short_trash_dir=t ;;
 	--chain-lint)
 		GIT_TEST_CHAIN_LINT=1 ;;
 	--no-chain-lint)
@@ -184,7 +186,12 @@ TEST_STRESS_JOB_SFX="${GIT_TEST_STRESS_JOB_NR:+.stress-$GIT_TEST_STRESS_JOB_NR}"
 TEST_NAME="$(basename "$0" .sh)"
 TEST_RESULTS_DIR="$TEST_OUTPUT_DIRECTORY/test-results"
 TEST_RESULTS_BASE="$TEST_RESULTS_DIR/$TEST_NAME$TEST_STRESS_JOB_SFX"
-TRASH_DIRECTORY="trash directory.$TEST_NAME$TEST_STRESS_JOB_SFX"
+if test -n "$short_trash_dir"
+then
+	TRASH_DIRECTORY="trash dir.${TEST_NAME%%-*}$TEST_STRESS_JOB_SFX"
+else
+	TRASH_DIRECTORY="trash directory.$TEST_NAME$TEST_STRESS_JOB_SFX"
+fi
 test -n "$root" && TRASH_DIRECTORY="$root/$TRASH_DIRECTORY"
 case "$TRASH_DIRECTORY" in
 /*) ;; # absolute path is good
@@ -336,13 +343,13 @@ TZ=UTC
 export LANG LC_ALL PAGER TZ
 EDITOR=:
 
-# GIT_TEST_GETTEXT_POISON should not influence git commands executed
-# during initialization of test-lib and the test repo. Back it up,
-# unset and then restore after initialization is finished.
-if test -n "$GIT_TEST_GETTEXT_POISON"
+# GIT_GETTEXT_POISON should not influence git commands executed during
+# initialization of test-lib and the test repo.
+# Back it up, unset and then restore after initialization is finished.
+if test -n "${GIT_GETTEXT_POISON-set}"
 then
-	GIT_TEST_GETTEXT_POISON_ORIG=$GIT_TEST_GETTEXT_POISON
-	unset GIT_TEST_GETTEXT_POISON
+	git_gettext_poison_backup=$GIT_GETTEXT_POISON
+	unset GIT_GETTEXT_POISON
 fi
 
 # A call to "unset" with no arguments causes at least Solaris 10
@@ -601,6 +608,10 @@ test_external_has_tap=0
 
 die () {
 	code=$?
+	# This is responsible for running the atexit commands even when a
+	# test script run with '--immediate' fails, or when the user hits
+	# ctrl-C, i.e. when 'test_done' is not invoked at all.
+	test_atexit_handler || code=$?
 	if test -n "$GIT_EXIT_OK"
 	then
 		exit $code
@@ -612,7 +623,10 @@ die () {
 
 GIT_EXIT_OK=
 trap 'die' EXIT
-trap 'exit $?' INT TERM HUP
+# Disable '-x' tracing, because with some shells, notably dash, it
+# prevents running the cleanup commands when a test script run with
+# '--verbose-log -x' is interrupted.
+trap '{ code=$?; set +x; } 2>/dev/null; exit $code' INT TERM HUP
 
 # The user-facing functions are loaded from a separate file so that
 # test_perf subshells can have them too
@@ -924,6 +938,26 @@ test_skip () {
 			of_prereq=" of $test_prereq"
 		fi
 		skipped_reason="missing $missing_prereq${of_prereq}"
+
+		case "$TRASH_DIRECTORY" in
+		*t0000*)
+			# ignore
+			;;
+		*)
+			test_results_dir="$TEST_OUTPUT_DIRECTORY/test-results"
+			if ! test -d "$test_results_dir"
+			then
+				mkdir -p "$test_results_dir"
+			fi
+			missing_prereq="$missing_prereq,"
+			while test -n "$missing_prereq"
+			do
+				mpr="${missing_prereq%%,*}"
+				echo "$mpr" >>"$test_results_dir/${TRASH_DIRECTORY#*.}.missing_prereqs"
+				missing_prereq="${missing_prereq#$mpr,}"
+			done
+			;;
+		esac
 	fi
 	if test -z "$to_skip" && test -n "$run_list" &&
 		! match_test_selector_list '--run' $test_count "$run_list"
@@ -949,8 +983,27 @@ test_at_end_hook_ () {
 	:
 }
 
+test_atexit_cleanup=:
+test_atexit_handler () {
+	# In a succeeding test script 'test_atexit_handler' is invoked
+	# twice: first from 'test_done', then from 'die' in the trap on
+	# EXIT.
+	# This condition and resetting 'test_atexit_cleanup' below makes
+	# sure that the registered cleanup commands are run only once.
+	test : != "$test_atexit_cleanup" || return 0
+
+	setup_malloc_check
+	test_eval_ "$test_atexit_cleanup"
+	test_atexit_cleanup=:
+	teardown_malloc_check
+}
+
 test_done () {
 	GIT_EXIT_OK=t
+
+	# Run the atexit commands _before_ the trash directory is
+	# removed, so the commands can access pidfiles and socket files.
+	test_atexit_handler
 
 	if test -z "$HARNESS_ACTIVE"
 	then
@@ -1255,15 +1308,18 @@ test -n "$USE_LIBPCRE1" && test_set_prereq LIBPCRE1
 test -n "$USE_LIBPCRE2" && test_set_prereq LIBPCRE2
 test -z "$NO_GETTEXT" && test_set_prereq GETTEXT
 
-if test -n "$GIT_TEST_GETTEXT_POISON_ORIG"
-then
-	GIT_TEST_GETTEXT_POISON=$GIT_TEST_GETTEXT_POISON_ORIG
-	unset GIT_TEST_GETTEXT_POISON_ORIG
-fi
-
 # Can we rely on git's output in the C locale?
-if test -z "$GIT_TEST_GETTEXT_POISON"
+if test -n "$GETTEXT_POISON"
 then
+	if test -n "${git_gettext_poison_backup-set}"
+	then
+		GIT_GETTEXT_POISON=$git_gettext_poison_backup
+	else
+		GIT_GETTEXT_POISON=YesPlease
+	fi
+	export GIT_GETTEXT_POISON
+	test_set_prereq GETTEXT_POISON
+else
 	test_set_prereq C_LOCALE_OUTPUT
 fi
 

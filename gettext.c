@@ -7,7 +7,6 @@
 #include "gettext.h"
 #include "strbuf.h"
 #include "utf8.h"
-#include "config.h"
 
 #ifndef NO_GETTEXT
 #	include <locale.h>
@@ -47,15 +46,68 @@ const char *get_preferred_languages(void)
 	return NULL;
 }
 
-int use_gettext_poison(void)
+#ifdef GETTEXT_POISON
+enum poison_mode use_gettext_poison(void)
 {
-	static int poison_requested = -1;
-	if (poison_requested == -1) {
-		const char *v = getenv("GIT_TEST_GETTEXT_POISON");
-		poison_requested = v && strlen(v) ? 1 : 0;
+	static enum poison_mode poison_mode = poison_mode_uninitialized;
+	if (poison_mode == poison_mode_uninitialized) {
+		const char *v = getenv("GIT_GETTEXT_POISON");
+		if (v && *v) {
+			if (!strcmp(v, "scrambled"))
+				poison_mode = poison_mode_scrambled;
+			else
+				poison_mode = poison_mode_default;
+		} else
+			poison_mode = poison_mode_none;
 	}
-	return poison_requested;
+	return poison_mode;
 }
+
+static int conversion_specifier_len(const char *s)
+{
+	const char printf_conversion_specifiers[] = "diouxXeEfFgGaAcsCSpnm%";
+	const char *format_end;
+
+	if (*s != '%')
+		return 0;
+
+	format_end = strpbrk(s + 1, printf_conversion_specifiers);
+	if (format_end)
+		return format_end - s;
+	else
+		return 0;
+}
+
+const char *gettext_scramble(const char *msg)
+{
+	struct strbuf sb;
+
+	strbuf_init(&sb,
+		    /* "# GETTEXT_POISON #" + ' ' + "m.e.s.s.a.g.e." + '\0' */
+		    strlen(GETTEXT_POISON_MAGIC) + 1 + 2 * strlen(msg) + 1);
+
+	strbuf_addch(&sb, ' ');
+	while (*msg) {
+		if (*msg == '\n') {
+			strbuf_addch(&sb, *(msg++));
+			continue;
+		} else if (*msg == '%') {
+			int spec_len = conversion_specifier_len(msg);
+			if (spec_len) {
+				strbuf_add(&sb, msg, spec_len);
+				msg += spec_len;
+				continue;
+			}
+		}
+
+		strbuf_addch(&sb, *(msg++));
+		strbuf_addch(&sb, '.');
+	}
+
+	/* This will be leaked... */
+	return strbuf_detach(&sb, NULL);
+}
+#endif
 
 #ifndef NO_GETTEXT
 static int test_vsnprintf(const char *fmt, ...)
@@ -164,8 +216,6 @@ void git_setup_gettext(void)
 
 	if (!podir)
 		podir = p = system_path(GIT_LOCALE_PATH);
-
-	use_gettext_poison(); /* getenv() reentrancy paranoia */
 
 	if (!is_directory(podir)) {
 		free(p);

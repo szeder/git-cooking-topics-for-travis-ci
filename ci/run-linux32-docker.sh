@@ -5,25 +5,26 @@
 
 . ${0%/*}/lib-travisci.sh
 
-docker pull daald/ubuntu32:xenial
-
 # Use the following command to debug the docker build locally:
 # $ docker run -itv "${PWD}:/usr/src/git" --entrypoint /bin/bash daald/ubuntu32:xenial
 # root@container:/# /usr/src/git/ci/run-linux32-build.sh <host-user-id>
 
 container_cache_dir=/tmp/travis-cache
 
+MAKEFLAGS=-j2
 docker run \
-	--interactive \
+	--interactive --tty \
+	--env MAKEFLAGS \
 	--env DEVELOPER \
 	--env DEFAULT_TEST_TARGET \
 	--env GIT_PROVE_OPTS \
 	--env GIT_TEST_OPTS \
 	--env GIT_TEST_CLONE_2GB \
 	--env cache_dir="$container_cache_dir" \
+	--env HOME=/home/ci \
 	--volume "${PWD}:/usr/src/git" \
 	--volume "$cache_dir:$container_cache_dir" \
-	daald/ubuntu32:xenial \
+	szeder/ubuntu32-for-git-ci:16.04-1 \
 	/usr/src/git/ci/run-linux32-build.sh $(id -u $USER)
 
 check_unignored_build_artifacts

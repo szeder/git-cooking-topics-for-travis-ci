@@ -94,17 +94,20 @@ then
 	jobname="$TRAVIS_OS_NAME-$CC"
 fi
 
+TEST_ROOT_DIR="$HOME/t"
 export DEVELOPER=1
 export DEFAULT_TEST_TARGET=prove
 export GIT_PROVE_OPTS="--timer --jobs 3 --state=failed,slow,save"
-export GIT_TEST_OPTS="--verbose-log -x --immediate"
+export GIT_TEST_OPTS="--verbose-log -x --immediate --short-trash-dir --root='$TEST_ROOT_DIR'"
 export GIT_TEST_CLONE_2GB=YesPlease
-if [ "$jobname" = linux-gcc ]; then
-	export CC=gcc-8
-fi
 
 case "$jobname" in
 linux-clang|linux-gcc)
+	if [ "$jobname" = linux-gcc ]
+	then
+		export CC=gcc-8
+	fi
+
 	export GIT_TEST_HTTPD=YesPlease
 
 	# The Linux build installs the defined dependency versions below.
@@ -118,12 +121,26 @@ linux-clang|linux-gcc)
 	export PATH="$GIT_LFS_PATH:$P4_PATH:$PATH"
 	;;
 osx-clang|osx-gcc)
+	if [ "$jobname" = osx-gcc ]
+	then
+		export CC=gcc-8
+	fi
+
 	# t9810 occasionally fails on Travis CI OS X
 	# t9816 occasionally fails with "TAP out of sequence errors" on
 	# Travis CI OS X
-	export GIT_SKIP_TESTS="t9810 t9816"
+	# In 't5570-git-daemon.sh', the tests 'fetch notices corrupt pack'
+	# and 'fetch notices corrupt idx' fail rather frequently.
+	export GIT_SKIP_TESTS="t9810 t9816 t5570.9 t5570.10"
 	;;
-GIT_TEST_GETTEXT_POISON)
-	export GIT_TEST_GETTEXT_POISON=YesPlease
+GETTEXT_POISON)
+	export GETTEXT_POISON=YesPlease
+	export GIT_GETTEXT_POISON=scrambled
+	;;
+Linux32)
+	TEST_ROOT_DIR=t/
+	export GIT_TEST_OPTS="${GIT_TEST_OPTS%--root=*}"
 	;;
 esac
+
+export MAKEFLAGS="CC=${CC:-cc}"

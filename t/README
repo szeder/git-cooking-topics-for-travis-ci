@@ -176,6 +176,14 @@ appropriately before running "make".
 	Using this option with a RAM-based filesystem (such as tmpfs)
 	can massively speed up the test suite.
 
+--short-trash-dir::
+	Create "trash" directories with shortened name, i.e.
+	'trash dir.t3410' instead of the default
+	'trash directory.t3410-rebase-preserve-dropped-merges'.
+	Use this option when you run into socket name length limits,
+	e.g. in tests with GPG prereq when using GnuPG v2.x, perhaps
+	in combination with a short --root directory.
+
 --chain-lint::
 --no-chain-lint::
 	If --chain-lint is enabled, the test harness will check each
@@ -318,12 +326,6 @@ that cannot be easily covered by a few specific test cases. These
 could be enabled by running the test suite with correct GIT_TEST_
 environment set.
 
-GIT_TEST_GETTEXT_POISON=<non-empty?> turns all strings marked for
-translation into gibberish if non-empty (think "test -n"). Used for
-spotting those tests that need to be marked with a C_LOCALE_OUTPUT
-prerequisite when adding more strings for translation. See "Testing
-marked strings" in po/README for details.
-
 GIT_TEST_SPLIT_INDEX=<boolean> forces split-index mode on the whole
 test suite. Accept any boolean values that are accepted by git-config.
 
@@ -441,8 +443,8 @@ This test harness library does the following things:
  - Creates an empty test directory with an empty .git/objects database
    and chdir(2) into it.  This directory is 't/trash
    directory.$test_name_without_dotsh', with t/ subject to change by
-   the --root option documented above, and a '.stress-<N>' suffix
-   appended by the --stress option.
+   the --root and --short-trash-dir options documented above, and a
+   '.stress-<N>' suffix appended by the --stress option.
 
  - Defines standard test helper functions for your scripts to
    use.  These functions are designed to make all scripts behave
@@ -838,6 +840,26 @@ library for your script to use.
 		test_when_finished "git update-ref -d refs/heads/invalid" &&
 		...
 	'
+
+ - test_atexit <script>
+
+   Prepend <script> to a list of commands to run unconditionally to
+   clean up before the test script exits, e.g. to stop a daemon:
+
+	test_expect_success 'test git daemon' '
+		git daemon &
+		daemon_pid=$! &&
+		test_atexit 'kill $daemon_pid' &&
+		hello world
+	'
+
+   The commands will be executed before the trash directory is removed,
+   i.e. the atexit commands will still be able to access any pidfiles or
+   socket files.
+
+   Note that these commands will be run even when a test script run
+   with '--immediate' fails.  Be careful with your atexit commands to
+   minimize any changes to the failed state.
 
  - test_write_lines <lines>
 

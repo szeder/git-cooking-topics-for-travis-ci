@@ -254,6 +254,4 @@ test_expect_success 'shallow fetches check connectivity before writing shallow f
 	git -C client fsck
 '
 
-stop_httpd
-
 test_done

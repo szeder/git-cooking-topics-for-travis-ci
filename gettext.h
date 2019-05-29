@@ -28,15 +28,12 @@
 
 #define FORMAT_PRESERVING(n) __attribute__((format_arg(n)))
 
-extern int use_gettext_poison(void);
-
 #ifndef NO_GETTEXT
 extern void git_setup_gettext(void);
 extern int gettext_width(const char *s);
 #else
 static inline void git_setup_gettext(void)
 {
-	use_gettext_poison(); /* getenv() reentrancy paranoia */
 }
 static inline int gettext_width(const char *s)
 {
@@ -44,19 +41,44 @@ static inline int gettext_width(const char *s)
 }
 #endif
 
+#ifdef GETTEXT_POISON
+enum poison_mode {
+	poison_mode_uninitialized = -1,
+	poison_mode_none = 0,
+	poison_mode_default,
+	poison_mode_scrambled
+};
+
+extern enum poison_mode use_gettext_poison(void);
+extern const char *gettext_scramble(const char *msg);
+
+#define GETTEXT_POISON_MAGIC "# GETTEXT POISON #"
+#endif
+
 static inline FORMAT_PRESERVING(1) const char *_(const char *msgid)
 {
 	if (!*msgid)
 		return "";
-	return use_gettext_poison() ? "# GETTEXT POISON #" : gettext(msgid);
+#ifdef GETTEXT_POISON
+	if (use_gettext_poison() == poison_mode_default)
+		return GETTEXT_POISON_MAGIC;
+	else if (use_gettext_poison() == poison_mode_scrambled)
+		return gettext_scramble(gettext(msgid));
+#endif
+	return gettext(msgid);
 }
 
 static inline FORMAT_PRESERVING(1) FORMAT_PRESERVING(2)
 const char *Q_(const char *msgid, const char *plu, unsigned long n)
 {
-	if (use_gettext_poison())
-		return "# GETTEXT POISON #";
-	return ngettext(msgid, plu, n);
+	const char *msg = ngettext(msgid, plu, n);
+#ifdef GETTEXT_POISON
+	if (use_gettext_poison() == poison_mode_default)
+		return GETTEXT_POISON_MAGIC;
+	else if (use_gettext_poison() == poison_mode_scrambled)
+		return gettext_scramble(msg);
+#endif
+	return msg;
 }
 
 /* Mark msgid for translation but do not translate it. */

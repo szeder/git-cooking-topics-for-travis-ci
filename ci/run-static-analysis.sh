@@ -5,7 +5,19 @@
 
 . ${0%/*}/lib-travisci.sh
 
-make --jobs=2 coccicheck
+if test -n "$1"
+then
+	HOST_UID_GID=$1
+else
+	HOST_UID_GID=$(id -u):$(id -g)
+fi
+
+docker run \
+	--interactive --tty \
+	--env MAKEFLAGS \
+	--volume "${PWD}:/src" \
+	--user $HOST_UID_GID \
+	szeder/coccinelle:1.0.7-1
 
 set +x
 

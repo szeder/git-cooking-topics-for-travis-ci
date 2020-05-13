@@ -136,6 +136,8 @@ do
 		;;
 	--tee)
 		tee=t ;;
+	--short-trash-dir)
+		short_trash_dir=t ;;
 	--root=*)
 		root=${opt#--*=} ;;
 	--chain-lint)
@@ -216,7 +218,13 @@ TEST_NUMBER="${TEST_NAME%%-*}"
 TEST_NUMBER="${TEST_NUMBER#t}"
 TEST_RESULTS_DIR="$TEST_OUTPUT_DIRECTORY/test-results"
 TEST_RESULTS_BASE="$TEST_RESULTS_DIR/$TEST_NAME$TEST_STRESS_JOB_SFX"
-TRASH_DIRECTORY="trash directory.$TEST_NAME$TEST_STRESS_JOB_SFX"
+if test -n "$short_trash_dir"
+then
+	TRASH_DIRECTORY="trash dir.${TEST_NAME%%-*}"
+else
+	TRASH_DIRECTORY="trash directory.$TEST_NAME"
+fi
+TRASH_DIRECTORY="$TRASH_DIRECTORY$TEST_STRESS_JOB_SFX"
 test -n "$root" && TRASH_DIRECTORY="$root/$TRASH_DIRECTORY"
 case "$TRASH_DIRECTORY" in
 /*) ;; # absolute path is good
@@ -371,13 +379,19 @@ TZ=UTC
 export LANG LC_ALL PAGER TZ
 EDITOR=:
 
-# GIT_TEST_GETTEXT_POISON should not influence git commands executed
-# during initialization of test-lib and the test repo. Back it up,
-# unset and then restore after initialization is finished.
+# GIT_TEST_GETTEXT_POISON and GIT_TEST_GETTEXT_POISON_SCRAMBLED should not
+# influence git commands executed during initialization of test-lib and
+# the test repo.
+# Back them up, unset and then restore after initialization is finished.
 if test -n "$GIT_TEST_GETTEXT_POISON"
 then
 	GIT_TEST_GETTEXT_POISON_ORIG=$GIT_TEST_GETTEXT_POISON
 	unset GIT_TEST_GETTEXT_POISON
+fi
+if test -n "$GIT_TEST_GETTEXT_POISON_SCRAMBLED"
+then
+	GIT_TEST_GETTEXT_POISON_SCRAMBLED_ORIG=$GIT_TEST_GETTEXT_POISON_SCRAMBLED
+	unset GIT_TEST_GETTEXT_POISON_SCRAMBLED
 fi
 
 # A call to "unset" with no arguments causes at least Solaris 10
@@ -1021,6 +1035,26 @@ test_skip () {
 			of_prereq=" of $test_prereq"
 		fi
 		skipped_reason="missing $missing_prereq${of_prereq}"
+
+		case "$TRASH_DIRECTORY" in
+		*t0000*)
+			# ignore
+			;;
+		*)
+			test_results_dir="$TEST_OUTPUT_DIRECTORY/test-results"
+			if ! test -d "$test_results_dir"
+			then
+				mkdir -p "$test_results_dir"
+			fi
+			missing_prereq="$missing_prereq,"
+			while test -n "$missing_prereq"
+			do
+				mpr="${missing_prereq%%,*}"
+				echo "$mpr" >>"$test_results_dir/${TRASH_DIRECTORY#*.}.missing_prereqs"
+				missing_prereq="${missing_prereq#$mpr,}"
+			done
+			;;
+		esac
 	fi
 
 	case "$to_skip" in
@@ -1480,6 +1514,12 @@ then
 	GIT_TEST_GETTEXT_POISON=$GIT_TEST_GETTEXT_POISON_ORIG
 	export GIT_TEST_GETTEXT_POISON
 	unset GIT_TEST_GETTEXT_POISON_ORIG
+fi
+if test -n "$GIT_TEST_GETTEXT_POISON_SCRAMBLED_ORIG"
+then
+	GIT_TEST_GETTEXT_POISON_SCRAMBLED=$GIT_TEST_GETTEXT_POISON_SCRAMBLED_ORIG
+	export GIT_TEST_GETTEXT_POISON_SCRAMBLED
+	unset GIT_TEST_GETTEXT_POISON_SCRAMBLED_ORIG
 fi
 
 test_lazy_prereq C_LOCALE_OUTPUT '

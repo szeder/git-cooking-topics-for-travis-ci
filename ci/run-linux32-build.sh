@@ -14,13 +14,6 @@ then
 	exit 1
 fi
 
-# Update packages to the latest available versions
-linux32 --32bit i386 sh -c '
-    apt update >/dev/null &&
-    apt install -y build-essential libcurl4-openssl-dev libssl-dev \
-	libexpat-dev gettext python >/dev/null
-'
-
 # If this script runs inside a docker container, then all commands are
 # usually executed as root. Consequently, the host user might not be
 # able to access the test output files.
@@ -50,11 +43,12 @@ else
 	test -n "$cache_dir" && chown -R $HOST_UID:$HOST_UID "$cache_dir"
 fi
 
-# Build and test
-linux32 --32bit i386 su -m -l $CI_USER -c '
+su -m -l $CI_USER -c '
 	set -ex
 	cd /usr/src/git
 	test -n "$cache_dir" && ln -s "$cache_dir/.prove" t/.prove
-	make
-	make test
+	make -k
+	mkfifo .git/prove-output
+	cat .git/prove-output &
+	make test >.git/prove-output
 '

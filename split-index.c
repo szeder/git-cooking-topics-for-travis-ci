@@ -256,8 +256,8 @@ void prepare_to_write_split_index(struct index_state *istate)
 				continue;
 			}
 			if (ce->index > si->base->cache_nr) {
-				BUG("ce refers to a shared ce at %d, which is beyond the shared index size %d",
-				    ce->index, si->base->cache_nr);
+				BUG("ce of '%s' refers to a shared ce at %d, which is beyond the shared index size %d",
+				    ce->name, ce->index, si->base->cache_nr);
 			}
 			ce->ce_flags |= CE_MATCHED; /* or "shared" */
 			base = si->base->cache[ce->index - 1];
@@ -295,10 +295,9 @@ void prepare_to_write_split_index(struct index_state *istate)
 				continue;
 			}
 			if (ce->ce_namelen != base->ce_namelen ||
-			    strcmp(ce->name, base->name)) {
-				ce->index = 0;
-				continue;
-			}
+			    strcmp(ce->name, base->name))
+				BUG("ce of '%s' refers to the shared ce of a different file '%s'",
+				    ce->name, base->name);
 			/*
 			 * This is the copy of a cache entry that is present
 			 * in the shared index, created by unpack_trees()
@@ -334,7 +333,8 @@ void prepare_to_write_split_index(struct index_state *istate)
 				 * set CE_UPDATE_IN_BASE as well.
 				 */
 				if (compare_ce_content(ce, base))
-					ce->ce_flags |= CE_UPDATE_IN_BASE;
+					BUG("ce of '%s' differs from its shared ce, but the CE_UPDATE_IN_BASE flag was not set",
+					    ce->name);
 			}
 			discard_cache_entry(base);
 			si->base->cache[ce->index - 1] = ce;

@@ -4,22 +4,33 @@ cache:
   directories:
     - $HOME/travis-cache
 
-os:
-  - linux
-  - osx
-
-osx_image: xcode10.1
-
-compiler:
-  - clang
-  - gcc
-
 matrix:
   include:
+    - env: jobname=linux-clang
+      os: linux
+      compiler: clang
+    - env: jobname=linux-gcc
+      os: linux
+      compiler: gcc
+    - env: jobname=osx-clang TEST_SELECTION="t[0-4][0-9][0-9][0-9]-*.sh"
+      os: osx
+      osx_image: xcode10.1
+      compiler: clang
+    - env: jobname=osx-clang TEST_SELECTION="t[5-9][0-9][0-9][0-9]-*.sh"
+      os: osx
+      osx_image: xcode10.1
+      compiler: clang
+    - env: jobname=osx-gcc TEST_SELECTION="t[0-4][0-9][0-9][0-9]-*.sh"
+      os: osx
+      osx_image: xcode10.1
+      compiler: gcc
+    - env: jobname=osx-gcc TEST_SELECTION="t[5-9][0-9][0-9][0-9]-*.sh"
+      os: osx
+      osx_image: xcode10.1
+      compiler: gcc
     - env: jobname=GETTEXT_POISON
       os: linux
       compiler:
-      addons:
       before_install:
     - env: jobname=linux-gcc-4.8
       os: linux
@@ -28,10 +39,8 @@ matrix:
     - env: jobname=Linux32
       os: linux
       compiler:
-      addons:
       services:
         - docker
-      before_install:
       script: ci/run-docker.sh
     - env: jobname=linux-musl
       os: linux
@@ -39,10 +48,15 @@ matrix:
       addons:
       services:
         - docker
-      before_install:
       script: ci/run-docker.sh
+    - env: jobname=s390x
+      arch: s390x
+      os: linux
+      compiler:
     - env: jobname=StaticAnalysis
       os: linux
+      services:
+        - docker
       compiler:
       script: ci/run-static-analysis.sh
       after_failure:

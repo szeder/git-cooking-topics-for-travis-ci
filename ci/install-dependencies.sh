@@ -15,7 +15,8 @@ case "$jobname" in
 linux-clang|linux-gcc)
 	sudo apt-add-repository -y "ppa:ubuntu-toolchain-r/test"
 	sudo apt-get -q update
-	sudo apt-get -q -y install language-pack-is libsvn-perl apache2 \
+	sudo apt-get -q -y install language-pack-is libsvn-perl apache2 time \
+		acl libio-pty-perl libjson-perl libhttp-date-perl \
 		$UBUNTU_COMMON_PKGS
 	case "$jobname" in
 	linux-gcc)
@@ -38,32 +39,31 @@ linux-clang|linux-gcc)
 	popd
 	;;
 osx-clang|osx-gcc)
-	export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
 	# Uncomment this if you want to run perf tests:
 	# brew install gnu-time
-	test -z "$BREW_INSTALL_PACKAGES" ||
-	brew install $BREW_INSTALL_PACKAGES
-	brew link --force gettext
-	brew cask install --no-quarantine perforce || {
-		# Update the definitions and try again
-		cask_repo="$(brew --repository)"/Library/Taps/homebrew/homebrew-cask &&
-		git -C "$cask_repo" pull --no-stat &&
-		brew cask install --no-quarantine perforce
-	} ||
-	brew install caskroom/cask/perforce
-	case "$jobname" in
-	osx-gcc)
-		brew install gcc@9
-		# Just in case the image is updated to contain gcc@9
-		# pre-installed but not linked.
-		brew link gcc@9
-		;;
-	esac
+	(
+		cd ~
+		ver=$(sw_vers | sed -n -e 's/^ProductVersion:[[:space:]]*\([0-9]*\.[0-9]*\)\..*/\1/p')
+		git clone --branch=ci-deps-osx-$ver --single-branch --depth=1 \
+			https://github.com/szeder/git deps
+		cd deps
+		./install.sh
+	)
+	;;
+Linux32)
+	docker pull szeder/ubuntu32-for-git-ci:16.04-1
+	;;
+linux-musl)
+	docker pull alpine
+	;;
+s390x)
+	sudo apt-get -q update
+	sudo apt-get -q -y install libcurl4-openssl-dev libssl-dev \
+		libexpat-dev gettext language-pack-is libsvn-perl apache2 \
+		acl libio-pty-perl libjson-perl libhttp-date-perl time
 	;;
 StaticAnalysis)
-	sudo apt-get -q update
-	sudo apt-get -q -y install coccinelle libcurl4-openssl-dev libssl-dev \
-		libexpat-dev gettext make
+	docker pull szeder/coccinelle:1.0.8-1
 	;;
 Documentation)
 	sudo apt-get -q update

@@ -7,7 +7,7 @@
 
 case "$jobname" in
 Linux32)
-	CI_CONTAINER="daald/ubuntu32:xenial"
+	CI_CONTAINER=szeder/ubuntu32-for-git-ci:16.04-1
 	;;
 linux-musl)
 	CI_CONTAINER=alpine
@@ -16,8 +16,6 @@ linux-musl)
 	exit 1
 	;;
 esac
-
-docker pull "$CI_CONTAINER"
 
 # Use the following command to debug the docker build locally:
 # <host-user-id> must be 0 if podman is used as drop-in replacement for docker

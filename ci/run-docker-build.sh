@@ -70,6 +70,8 @@ command $switch_cmd su -m -l $CI_USER -c "
 	export cache_dir='$cache_dir'
 	cd /usr/src/git
 	test -n '$cache_dir' && ln -s '$cache_dir/.prove' t/.prove
-	make
-	make test
+	make -k
+	mkfifo .git/prove-output
+	cat .git/prove-output &
+	make test >.git/prove-output
 "

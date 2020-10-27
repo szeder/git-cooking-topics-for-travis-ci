@@ -106,9 +106,9 @@ then
 		echo "https://travis-ci.org/$CI_REPO_SLUG/jobs/$1"
 	}
 
-	BREW_INSTALL_PACKAGES="git-lfs gettext"
 	export GIT_PROVE_OPTS="--timer --jobs 3 --state=failed,slow,save"
-	export GIT_TEST_OPTS="--verbose-log -x --immediate"
+	TEST_ROOT_DIR="$HOME/t"
+	export GIT_TEST_OPTS="--verbose-log -x --immediate --short-trash-dir --root='$TEST_ROOT_DIR'"
 	MAKEFLAGS="$MAKEFLAGS --jobs=2"
 elif test -n "$SYSTEM_COLLECTIONURI" || test -n "$SYSTEM_TASKDEFINITIONSURI"
 then
@@ -162,9 +162,9 @@ linux-clang|linux-gcc)
 	if [ "$jobname" = linux-gcc ]
 	then
 		export CC=gcc-8
-		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=$(which python3)"
+		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python3"
 	else
-		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=$(which python2)"
+		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=/usr/bin/python2"
 	fi
 
 	export GIT_TEST_HTTPD=true
@@ -190,6 +190,11 @@ osx-clang|osx-gcc)
 		MAKEFLAGS="$MAKEFLAGS PYTHON_PATH=$(which python2)"
 	fi
 
+	MAKEFLAGS="$MAKEFLAGS CPPFLAGS+=-I/usr/local/opt/gettext/include"
+	MAKEFLAGS="$MAKEFLAGS LDFLAGS+=-L/usr/local/opt/gettext/lib"
+
+	PATH=/usr/local/opt/gettext/bin:$PATH
+
 	# t9810 occasionally fails on Travis CI OS X
 	# t9816 occasionally fails with "TAP out of sequence errors" on
 	# Travis CI OS X
@@ -197,6 +202,15 @@ osx-clang|osx-gcc)
 	;;
 GIT_TEST_GETTEXT_POISON)
 	export GIT_TEST_GETTEXT_POISON=true
+	export GIT_TEST_GETTEXT_POISON_SCRAMBLED=true
+	;;
+Linux32)
+	TEST_ROOT_DIR="t/"
+	export GIT_TEST_OPTS="${GIT_TEST_OPTS%--root=*}"
+	;;
+s390x)
+	# t5319-multi-pack-index.sh is very flaky on s390x.
+	export GIT_SKIP_TESTS=t5319
 	;;
 esac
 

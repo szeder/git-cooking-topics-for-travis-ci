@@ -8,9 +8,9 @@
 # Tracing executed commands would produce too much noise in the loop below.
 set +x
 
-cd t/
+test_results_dir="$(pwd)/t/test-results"
 
-if ! ls test-results/*.exit >/dev/null 2>/dev/null
+if ! ls "$test_results_dir"/*.exit >/dev/null 2>/dev/null
 then
 	echo "Build job failed before the tests could have been run"
 	exit
@@ -24,8 +24,10 @@ osx-clang|osx-gcc)
 	;;
 esac
 
+cd "$TEST_ROOT_DIR"
+
 combined_trash_size=0
-for TEST_EXIT in test-results/*.exit
+for TEST_EXIT in "$test_results_dir"/*.exit
 do
 	if [ "$(cat "$TEST_EXIT")" != "0" ]
 	then
@@ -37,7 +39,7 @@ do
 
 		test_name="${TEST_EXIT%.exit}"
 		test_name="${test_name##*/}"
-		trash_dir="trash directory.$test_name"
+		trash_dir="trash dir.${test_name%%-*}"
 		case "$CI_TYPE" in
 		travis)
 			;;

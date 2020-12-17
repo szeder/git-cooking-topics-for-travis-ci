@@ -81,19 +81,23 @@ test_expect_success 'env--helper --type=ulong' '
 '
 
 test_expect_success 'env--helper reads config thanks to trace2' '
-	mkdir home &&
-	git config -f home/.gitconfig include.path cycle &&
-	git config -f home/cycle include.path .gitconfig &&
+	(
+		sane_unset GIT_TEST_GETTEXT_POISON_SCRAMBLED &&
 
-	test_must_fail \
-		env HOME="$(pwd)/home" GIT_TEST_GETTEXT_POISON=false \
-		git config -l 2>err &&
-	grep "exceeded maximum include depth" err &&
+		mkdir home &&
+		git config -f home/.gitconfig include.path cycle &&
+		git config -f home/cycle include.path .gitconfig &&
 
-	test_must_fail \
-		env HOME="$(pwd)/home" GIT_TEST_GETTEXT_POISON=true \
-		git -C cycle env--helper --type=bool --default=0 --exit-code GIT_TEST_GETTEXT_POISON 2>err &&
-	grep "# GETTEXT POISON #" err
+		test_must_fail \
+			env HOME="$(pwd)/home" GIT_TEST_GETTEXT_POISON=false \
+			git config -l 2>err &&
+		grep "exceeded maximum include depth" err &&
+
+		test_must_fail \
+			env HOME="$(pwd)/home" GIT_TEST_GETTEXT_POISON=true \
+			git -C cycle env--helper --type=bool --default=0 --exit-code GIT_TEST_GETTEXT_POISON 2>err &&
+		grep "# GETTEXT POISON #" err
+	)
 '
 
 test_done

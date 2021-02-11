@@ -65,12 +65,65 @@ const char *get_preferred_languages(void)
 	return NULL;
 }
 
-int use_gettext_poison(void)
+enum poison_mode use_gettext_poison(void)
 {
-	static int poison_requested = -1;
-	if (poison_requested == -1)
-		poison_requested = git_env_bool("GIT_TEST_GETTEXT_POISON", 0);
-	return poison_requested;
+	static enum poison_mode poison_mode = poison_mode_uninitialized;
+	if (poison_mode == poison_mode_uninitialized) {
+		if (git_env_bool("GIT_TEST_GETTEXT_POISON", 0)) {
+			if (git_env_bool("GIT_TEST_GETTEXT_POISON_SCRAMBLED", 0))
+				poison_mode = poison_mode_scrambled;
+			else
+				poison_mode = poison_mode_default;
+		} else
+			poison_mode = poison_mode_none;
+
+	}
+	return poison_mode;
+}
+
+static int conversion_specifier_len(const char *s)
+{
+	const char printf_conversion_specifiers[] = "diouxXeEfFgGaAcsCSpnm%";
+	const char *format_end;
+
+	if (*s != '%')
+		return 0;
+
+	format_end = strpbrk(s + 1, printf_conversion_specifiers);
+	if (format_end)
+		return format_end - s;
+	else
+		return 0;
+}
+
+const char *gettext_scramble(const char *msg)
+{
+	struct strbuf sb;
+
+	strbuf_init(&sb,
+		    /* "# GETTEXT_POISON #" + ' ' + "m.e.s.s.a.g.e." + '\0' */
+		    strlen(GETTEXT_POISON_MAGIC) + 1 + 2 * strlen(msg) + 1);
+
+	strbuf_addch(&sb, ' ');
+	while (*msg) {
+		if (*msg == '\n') {
+			strbuf_addch(&sb, *(msg++));
+			continue;
+		} else if (*msg == '%') {
+			int spec_len = conversion_specifier_len(msg);
+			if (spec_len) {
+				strbuf_add(&sb, msg, spec_len);
+				msg += spec_len;
+				continue;
+			}
+		}
+
+		strbuf_addch(&sb, *(msg++));
+		strbuf_addch(&sb, '.');
+	}
+
+	/* This will be leaked... */
+	return strbuf_detach(&sb, NULL);
 }
 
 #ifndef NO_GETTEXT

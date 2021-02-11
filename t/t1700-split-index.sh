@@ -454,25 +454,6 @@ done <<\EOF
 0642 -rw-r---w-
 EOF
 
-test_expect_success POSIXPERM,SANITY 'graceful handling when splitting index is not allowed' '
-	test_create_repo ro &&
-	(
-		cd ro &&
-		test_commit initial &&
-		git update-index --split-index &&
-		test -f .git/sharedindex.*
-	) &&
-	cp ro/.git/index new-index &&
-	test_when_finished "chmod u+w ro/.git" &&
-	chmod u-w ro/.git &&
-	GIT_INDEX_FILE="$(pwd)/new-index" git -C ro update-index --split-index &&
-	chmod u+w ro/.git &&
-	rm ro/.git/sharedindex.* &&
-	GIT_INDEX_FILE=new-index git ls-files >actual &&
-	echo initial.t >expected &&
-	test_cmp expected actual
-'
-
 test_expect_success 'writing split index with null sha1 does not write cache tree' '
 	git config core.splitIndex true &&
 	git config splitIndex.maxPercentChange 0 &&
@@ -507,6 +488,67 @@ test_expect_success 'do not refresh null base index' '
 		# i.e. do not expect warnings like
 		# could not freshen shared index .../shareindex.00000...
 		test_must_be_empty err
+	)
+'
+
+test_expect_success 'alternate index and split index' '
+	test_create_repo no-split-alternate-location &&
+	(
+		cd no-split-alternate-location &&
+		>file1 &&
+		>file2 &&
+		>file3 &&
+
+		git update-index --split-index --add file1 &&
+		ls .git/sharedindex.* >expect &&
+
+		GIT_INDEX_FILE=.git/otherindex \
+		git update-index --split-index --add file2 &&
+		ls .git/sharedindex.* >actual &&
+		test_cmp expect actual &&
+
+		GIT_INDEX_FILE=.git/otherindex2 \
+		git -c splitIndex.sharedIndexExpire=now \
+			update-index --split-index --add file2 &&
+		ls .git/sharedindex.* >actual &&
+		test_cmp expect actual &&
+
+		git ls-files --cached >actual &&
+		echo file1 >expect &&
+		test_cmp expect actual
+	)
+'
+
+test_expect_success 'reading split index at alternate location' '
+	test_create_repo reading-alternate-location &&
+	(
+		cd reading-alternate-location &&
+		>file-in-alternate &&
+		git update-index --split-index --add file-in-alternate
+	) &&
+
+	# Should be able to find the shared index both next to the
+	# split index ...
+	GIT_INDEX_FILE=./reading-alternate-location/.git/index \
+	git ls-files --cached >actual &&
+	echo file-in-alternate >expect &&
+	test_cmp expect actual &&
+
+	# ... and in the current GIT_DIR as well.
+	mv -v ./reading-alternate-location/.git/sharedindex.* .git &&
+	GIT_INDEX_FILE=./reading-alternate-location/.git/index \
+	git ls-files --cached >actual &&
+	test_cmp expect actual
+'
+
+test_expect_success 'GIT_TEST_SPLIT_INDEX works' '
+	test_create_repo git-test-split-index &&
+	(
+		cd git-test-split-index &&
+		>file &&
+		GIT_TEST_SPLIT_INDEX=1 git update-index --add file &&
+		ls -l .git/sharedindex.* >actual &&
+		test_line_count = 1 actual
 	)
 '
 

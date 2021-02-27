@@ -14,10 +14,11 @@ splitIndex.maxPercentChange::
 splitIndex.sharedIndexExpire::
 	When the split index feature is used, shared index files that
 	were not modified since the time this variable specifies will
-	be removed when a new shared index file is created. The value
-	"now" expires all entries immediately, and "never" suppresses
-	expiration altogether.
-	The default value is "2.weeks.ago".
+	be removed when a new shared index file is created.  The
+	default value is "2.weeks.ago". The value "never" suppresses
+	expiration altogether.  The value "now" expires all entries
+	immediately, but risks errors if another process is accessing
+	the index concurrently.
 	Note that a shared index file is considered modified (for the
 	purpose of expiration) each time a new split-index file is
 	either created based on it or read from it.

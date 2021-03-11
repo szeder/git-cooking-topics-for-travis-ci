@@ -57,6 +57,7 @@ void progress_test_force_update(void)
 {
 	progress_update = 1;
 }
+static struct progress *current_progress = NULL;
 
 
 static void progress_interval(int signum)
@@ -111,10 +112,11 @@ static void display(struct progress *progress, uint64_t n, const char *done)
 	int show_update = 0;
 	int last_count_len = counters_sb->len;
 
+	progress->last_value = n;
+
 	if (progress->delay && (!progress_update || --progress->delay))
 		return;
 
-	progress->last_value = n;
 	tp = (progress->throughput) ? progress->throughput->display.buf : "";
 	if (progress->total) {
 		unsigned percent = n * 100 / progress->total;
@@ -253,6 +255,12 @@ static struct progress *start_progress_delay(const char *title, uint64_t total,
 					     unsigned delay, unsigned sparse)
 {
 	struct progress *progress = xmalloc(sizeof(*progress));
+	if (git_env_bool("GIT_TEST_CHECK_PROGRESS", 0)) {
+		if (current_progress)
+			BUG("progress \"%s\" is already in progress",
+			    current_progress->title);
+		current_progress = progress;
+	}
 	progress->title = title;
 	progress->total = total;
 	progress->last_value = -1;
@@ -371,6 +379,13 @@ void stop_progress_msg(struct progress **p_progress, const char *msg)
 	strbuf_release(&progress->counters_sb);
 	if (progress->throughput)
 		strbuf_release(&progress->throughput->display);
+	if (git_env_bool("GIT_TEST_CHECK_PROGRESS", 0)) {
+		if (progress->total && progress->total != progress->last_value)
+			BUG("total progress does not match for \"%s\": expected: %"PRIuMAX" got: %"PRIuMAX,
+			    progress->title, (uintmax_t)progress->total,
+			    (uintmax_t)progress->last_value);
+		current_progress = NULL;
+	}
 	free(progress->throughput);
 	free(progress);
 }

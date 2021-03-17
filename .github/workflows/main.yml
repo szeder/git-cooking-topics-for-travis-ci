@@ -252,6 +252,7 @@ jobs:
         MSYSTEM: MINGW64
         NO_SVN_TESTS: 1
         GIT_TEST_SKIP_REBASE_P: 1
+        GIT_TEST_MERGE_ALGORITHM: ort
       run: |
         & .\git-sdk-64-minimal\usr\bin\bash.exe -lc @"
           # Let Git ignore the SDK and the test-cache

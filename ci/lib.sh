@@ -183,6 +183,12 @@ export GIT_TEST_CLONE_2GB=true
 export SKIP_DASHED_BUILT_INS=YesPlease
 
 case "$jobname" in
+*-gcc)
+	export GIT_TEST_MERGE_ALGORITHM=ort
+	;;
+esac
+
+case "$jobname" in
 linux-clang|linux-gcc)
 	if [ "$jobname" = linux-gcc ]
 	then

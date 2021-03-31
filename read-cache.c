@@ -2353,7 +2353,15 @@ int read_index_from(struct index_state *istate, const char *path,
 	base_path = xstrfmt("%s/sharedindex.%s", gitdir, base_oid_hex);
 	trace2_region_enter_printf("index", "shared/do_read_index",
 				   the_repository, "%s", base_path);
-	ret = do_read_index(split_index->base, base_path, 1);
+	ret = do_read_index(split_index->base, base_path, 0);
+	if (!ret) {
+		char *path_copy = xstrdup(path);
+		free(base_path);
+		base_path = xstrfmt("%s/sharedindex.%s", dirname(path_copy),
+				    base_oid_hex);
+		free(path_copy);
+		ret = do_read_index(split_index->base, base_path, 1);
+	}
 	trace2_region_leave_printf("index", "shared/do_read_index",
 				   the_repository, "%s", base_path);
 	if (!oideq(&split_index->base_oid, &split_index->base->oid))
@@ -3268,6 +3276,20 @@ static int too_many_not_shared_entries(struct index_state *istate)
 	return (int64_t)istate->cache_nr * max_split < (int64_t)not_shared * 100;
 }
 
+static int is_gitdir_index_lock(struct lock_file *lock)
+{
+	char *lock_path = real_pathdup(get_lock_file_path(lock), 0);
+	char *index_lock_path = real_pathdup(git_path("index.lock"), 0);
+	int ret;
+
+	ret = !strcmp(lock_path, index_lock_path);
+
+	free(lock_path);
+	free(index_lock_path);
+
+	return ret;
+}
+
 int write_locked_index(struct index_state *istate, struct lock_file *lock,
 		       unsigned flags)
 {
@@ -3286,7 +3308,7 @@ int write_locked_index(struct index_state *istate, struct lock_file *lock,
 	if (istate->fsmonitor_last_update)
 		fill_fsmonitor_bitmap(istate);
 
-	if (!si || alternate_index_output ||
+	if (!si || !is_gitdir_index_lock(lock) || alternate_index_output ||
 	    (istate->cache_changed & ~EXTMASK)) {
 		if (si)
 			oidclr(&si->base_oid);

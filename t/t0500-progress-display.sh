@@ -308,4 +308,42 @@ test_expect_success 'progress generates traces' '
 	grep "\"key\":\"total_bytes\",\"value\":\"409600\"" trace.event
 '
 
+test_expect_success 'GIT_TEST_CHECK_PROGRESS catches non-matching total' '
+	cat >in <<-\EOF &&
+	progress 1
+	progress 2
+	progress 4
+	EOF
+
+	test_must_fail env GIT_TEST_CHECK_PROGRESS=1 \
+		test-tool progress --total=3 "Working hard" <in 2>stderr &&
+	test_i18ngrep "Working hard: 133% (4/3), done." stderr &&
+	grep "BUG:.*total progress does not match" stderr &&
+
+	test_must_fail env GIT_TEST_CHECK_PROGRESS=1 \
+		test-tool progress --total=5 "Working hard" <in 2>stderr &&
+	test_i18ngrep "Working hard:  80% (4/5), done." stderr &&
+	grep "BUG:.*total progress does not match" stderr
+'
+
+test_expect_success 'non-matching total works without GIT_TEST_CHECK_PROGRESS' '
+	cat >expect <<-\EOF &&
+	Working hard:  33% (1/3)<CR>
+	Working hard:  66% (2/3)<CR>
+	Working hard:  66% (2/3), done.
+	EOF
+
+	cat >in <<-\EOF &&
+	progress 1
+	progress 2
+	EOF
+	(
+		sane_unset GIT_TEST_CHECK_PROGRESS &&
+		test-tool progress --total=3 "Working hard" <in 2>stderr
+	) &&
+
+	show_cr <stderr >out &&
+	test_i18ncmp expect out
+'
+
 test_done

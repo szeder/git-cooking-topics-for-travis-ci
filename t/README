@@ -186,6 +186,14 @@ appropriately before running "make". Short options can be bundled, i.e.
 	Using this option with a RAM-based filesystem (such as tmpfs)
 	can massively speed up the test suite.
 
+--short-trash-dir::
+	Create "trash" directories with shortened name, i.e.
+	'trash dir.t3410' instead of the default
+	'trash directory.t3410-rebase-preserve-dropped-merges'.
+	Use this option when you run into socket name length limits,
+	e.g. in tests with GPG prereq when using GnuPG v2.x, perhaps
+	in combination with a short --root directory.
+
 --chain-lint::
 --no-chain-lint::
 	If --chain-lint is enabled, the test harness will check each
@@ -509,9 +517,8 @@ This test harness library does the following things:
 
  - Creates an empty test directory with an empty .git/objects database
    and chdir(2) into it.  This directory is 't/trash
-   directory.$test_name_without_dotsh', with t/ subject to change by
-   the --root option documented above, and a '.stress-<N>' suffix
-   appended by the --stress option.
+   directory.$test_name_without_dotsh' by default, but it's subject to
+   the --root, --stress, and --short-trash-dir options documented above.
 
  - Defines standard test helper functions for your scripts to
    use.  These functions are designed to make all scripts behave

@@ -51,6 +51,7 @@ failed:
 
 prove: pre-clean check-chainlint $(TEST_LINT)
 	@echo "*** prove ***"; $(PROVE) --exec '$(TEST_SHELL_PATH_SQ)' $(GIT_PROVE_OPTS) $(T) :: $(GIT_TEST_OPTS)
+	$(MAKE) show-missed-prereqs
 	$(MAKE) clean-except-prove-cache
 
 $(T):
@@ -110,6 +111,20 @@ aggregate-results:
 	for f in '$(TEST_RESULTS_DIRECTORY_SQ)'/t*-*.counts; do \
 		echo "$$f"; \
 	done | '$(SHELL_PATH_SQ)' ./aggregate-results.sh
+	$(MAKE) show-missed-prereqs
+
+show-missed-prereqs:
+	@missed_prereqs="$$(sort test-results/*.missing_prereqs 2>/dev/null | uniq)"; \
+	if test -n "$$missed_prereqs"; then \
+		echo "Missed prereqs:"; \
+		: Missed prereqs look better when listed in columns, but ; \
+		: the column command might not be available.             ; \
+		if type column 2>/dev/null; then \
+			echo "$$missed_prereqs" | column; \
+		else \
+			echo "$$missed_prereqs"; \
+		fi; \
+	fi
 
 gitweb-test:
 	$(MAKE) $(TGITWEB)

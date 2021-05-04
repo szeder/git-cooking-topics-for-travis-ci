@@ -47,6 +47,10 @@ struct progress {
 
 static volatile sig_atomic_t progress_update;
 
+static int check_progress;
+/* Used to catch nested/overlapping progresses with GIT_TEST_CHECK_PROGRESS. */
+static struct progress *current_progress = NULL;
+
 /*
  * These are only intended for testing the progress output, i.e. exclusively
  * for 'test-tool progress'.
@@ -111,10 +115,17 @@ static void display(struct progress *progress, uint64_t n, const char *done)
 	int show_update = 0;
 	int last_count_len = counters_sb->len;
 
+	if (check_progress && progress->last_value != -1 &&
+	    n < progress->last_value)
+		BUG("progress \"%s\" counts backwards %"PRIuMAX" -> %"PRIuMAX,
+		    progress->title, (uintmax_t)progress->last_value,
+		    (uintmax_t)n);
+
+	progress->last_value = n;
+
 	if (progress->delay && (!progress_update || --progress->delay))
 		return;
 
-	progress->last_value = n;
 	tp = (progress->throughput) ? progress->throughput->display.buf : "";
 	if (progress->total) {
 		unsigned percent = n * 100 / progress->total;
@@ -252,7 +263,15 @@ void display_progress(struct progress *progress, uint64_t n)
 static struct progress *start_progress_delay(const char *title, uint64_t total,
 					     unsigned delay, unsigned sparse)
 {
-	struct progress *progress = xmalloc(sizeof(*progress));
+	struct progress *progress;
+
+	check_progress = git_env_bool("GIT_TEST_CHECK_PROGRESS", 0);
+	if (check_progress && current_progress)
+		BUG("progress \"%s\" is still active when starting new progress \"%s\"",
+		    current_progress->title, title);
+
+	progress = xmalloc(sizeof(*progress));
+	current_progress = progress;
 	progress->title = title;
 	progress->total = total;
 	progress->last_value = -1;
@@ -371,6 +390,12 @@ void stop_progress_msg(struct progress **p_progress, const char *msg)
 	strbuf_release(&progress->counters_sb);
 	if (progress->throughput)
 		strbuf_release(&progress->throughput->display);
+	if (check_progress && progress->total &&
+	    progress->total != progress->last_value)
+		BUG("total progress does not match for \"%s\": expected: %"PRIuMAX" got: %"PRIuMAX,
+		    progress->title, (uintmax_t)progress->total,
+		    (uintmax_t)progress->last_value);
 	free(progress->throughput);
 	free(progress);
+	current_progress = NULL;
 }
